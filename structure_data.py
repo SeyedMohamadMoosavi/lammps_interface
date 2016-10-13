@@ -282,7 +282,7 @@ class MolecularGraph(nx.Graph):
             if (set("O") < elements) and (len(elements & metals)):
                 tempsf = 0.85
 
-            if dist*tempsf < rad:
+            if dist*tempsf < rad and not alkali | elements:
 
                 flag = self.compute_bond_image_flag(n1, n2, cell)
                 self.sorted_edge_dict.update({(n1,n2): (n1, n2), (n2, n1):(n1, n2)})
@@ -485,18 +485,23 @@ class MolecularGraph(nx.Graph):
                     self.node[label].update({'hybridization':'sp2'})
                 elif len(neighbours) == 1:
                     self.node[label].update({'hybridization':'sp'})
+                else:
+                    self.node[label].update({'hybridization':'sp3'})
             elif element == "O":
                 if len(neighbours) >= 2:
                     self.node[label].update({'hybridization':'sp3'})
                 elif len(neighbours) == 1:
                     self.node[label].update({'hybridization':'sp2'})
+                else:
+                    # If it has no neighbours, just give it SP3
+                    self.node[label].update({'hybridization':'sp3'})
             elif element == "S":
                 if len(neighbours) >= 2:
                     self.node[label].update({'hybridization':'sp3'})
                 elif len(neighbours) == 1:
                     self.node[label].update({'hybridization':'sp2'})
                 else:
-                    print(len(neighbours))
+                    self.node[label].update({'hybridization':'sp3'})
 
             else:
                 #default sp3
@@ -1168,6 +1173,8 @@ class MolecularGraph(nx.Graph):
         return self
 
     def __or__(self, graph):
+        if (len(graph.nodes()) == 1) and len(self.nodes()) == 1:
+            return list([0]) 
         cg = self.correspondence_graph(graph, 0.4)
         cliques = list(nx.find_cliques(cg))
         cliques.sort(key=len)
