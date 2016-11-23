@@ -1,0 +1,7 @@
+here are the changes from the original version
+add and remove to track the changes:
+
+1.charges are ignored if there are charges in the cif file
+2. interface does not read the atomic force field type from cif file. 
+   its in the structure_data.py and _atom_site_description line: 186: 
+        fftype = None
