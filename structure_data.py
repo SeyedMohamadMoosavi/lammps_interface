@@ -168,6 +168,7 @@ class MolecularGraph(nx.Graph):
             for key in charge_keywords:
                 try:
                     kwargs['charge'] = float(kwargs[key])
+                    kwargs['charge'] = float(0.0)
                 except KeyError:
                     pass
                 except ValueError:
@@ -182,6 +183,7 @@ class MolecularGraph(nx.Graph):
         except KeyError:
             fftype = None
 
+        fftype = None   # MOHAMAD
         kwargs.update({'force_field_type':fftype})
         idx = self.number_of_nodes() + 1
         kwargs.update({'index':idx})
