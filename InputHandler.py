@@ -91,6 +91,11 @@ class Options(object):
                                           "Useful for structure minimizations. Currently only "+
                                           "applies to UFF and Dreiding Force Fields. Default is "+
                                           "off.")
+        force_field_group.add_argument("--qeq", action="store_true", 
+                                       dest="qeq",
+                                       default=False,
+                                       help="Using LAMMPS to generate charges with QEq method.")
+
         
         simulation_group = parser.add_argument_group("Simulation options")
         simulation_group.add_argument("--minimize", action="store_true",
@@ -98,6 +103,16 @@ class Options(object):
                                       default=False,
                                       help="Request input files necessary for"
                                       + " a geometry optimization. Default off")
+        simulation_group.add_argument("--relax", action="store_true",
+                                      dest="relax",
+                                      default=False,
+                                      help="Request input files necessary for"
+                                      + " atomic position relaxation. Default off")
+        simulation_group.add_argument("--rel-def", action="store_true",
+                                      dest="reldef",
+                                      default=False,
+                                      help="Request input files necessary for"
+                                      + " atomic position relaxation with reading a relaxed dump. Default off")
         simulation_group.add_argument("--bulk-moduli", action="store_true",
                                       dest="bulk_moduli",
                                       default=False,

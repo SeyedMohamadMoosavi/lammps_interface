@@ -694,8 +694,9 @@ class LammpsSimulation(object):
         string += "%19.6f %10.6f %s %s\n"%(0., self.cell.lx, "xlo", "xhi")
         string += "%19.6f %10.6f %s %s\n"%(0., self.cell.ly, "ylo", "yhi")
         string += "%19.6f %10.6f %s %s\n"%(0., self.cell.lz, "zlo", "zhi")
-        if (np.any(np.array([self.cell.xy, self.cell.xz, self.cell.yz]) > 0.0)):
-            string += "%19.6f %10.6f %10.6f %s %s %s\n"%(self.cell.xy, self.cell.xz, self.cell.yz, "xy", "xz", "yz")
+#         if not (np.allclose(np.array([self.cell.xy, self.cell.xz, self.cell.yz]), 0.0)):
+#             string += "%19.6f %10.6f %10.6f %s %s %s\n"%(self.cell.xy, self.cell.xz, self.cell.yz, "xy", "xz", "yz")
+        string += "%19.6f %10.6f %10.6f %s %s %s\n"%(self.cell.xy, self.cell.xz, self.cell.yz, "xy", "xz", "yz")
     
         # Let's track the forcefield potentials that haven't been calc'd or user specified
         no_bond = []
@@ -1281,7 +1282,113 @@ class LammpsSimulation(object):
             inp_str += "%-15s %s\n"%("next", "iter")
             inp_str += "%-15s %s\n"%("jump", "SELF loop_min")
             inp_str += "%-15s %s\n"%("label", "break_min")
+            # MOHAMAD: move box to 0,0,0!
+            inp_str += "change_box         all x delta $(-xlo) $(-xlo) y delta $(-ylo) $(-ylo) z delta $(-zlo) $(-zlo) remap units box\n"
+            inp_str += "reset_timestep 0\n"
+            # MOHAMAD: dump the relaxed structure
+            inp_str += "dump  str_relax all atom 1 relaxed_structure.dump\n"
+            # TODO: add lammpstrj here!
+            inp_str += "dump            relax all custom 1 relaxed.lammpstrj element x y z\n"
+            inp_str += "%-15s %s\n"%("dump_modify", "relax element %s"%(
+                                     " ".join([self.graph.node[self.unique_atom_types[key]]['element'] 
+                                                for key in sorted(self.unique_atom_types.keys())])))
+            inp_str += "run 0\n"
+            inp_str += "undump str_relax\n"
+            inp_str += "undump relax\n"
 
+
+        if (self.options.reldef):
+            inp_str +="read_dump   relaxed_structure.dump 0 x y z box yes format native\n"
+            min_style = "cg"
+            min_eval = 1e-11  # HKUST-1 will not minimize past 1e-11
+            max_iterations = 10000 # if the minimizer can't reach a minimum in this many steps,
+                                    # change the min_eval to something higher.
+            #inp_str += "%-15s %s\n"%("min_style","fire")
+            #inp_str += "%-15s %i %s\n"%("compute", 1, "all msd com yes")
+            #inp_str += "%-15s %-10s %s\n"%("variable", "Dx", "equal c_1[1]")
+            #inp_str += "%-15s %-10s %s\n"%("variable", "Dy", "equal c_1[2]")
+            #inp_str += "%-15s %-10s %s\n"%("variable", "Dz", "equal c_1[3]")
+            #inp_str += "%-15s %-10s %s\n"%("variable", "MSD", "equal c_1[4]")
+            #inp_str += "%-15s %s %s\n"%("fix", "output all print 1", "\"$(vol),$(cella),$(cellb),$(cellc),${Dx},${Dy},${Dz},${MSD}\"" +
+            #                                " file %s.min.csv title \"Vol,CellA,CellB,CellC,Dx,Dy,Dz,MSD\" screen no"%(self.name))
+            inp_str += "thermo 100\n"
+            inp_str += "thermo_style custom step etotal vol\n"
+            inp_str += "%-15s %s\n"%("print", "\"MinStep,CellMinStep,AtomMinStep,FinalStep,Energy,EDiff\"" + 
+                                              " file %s.min.csv screen no"%(self.name))
+            inp_str += "%-15s %-10s %s\n"%("variable", "min_eval", "equal %.2e"%(min_eval))
+            inp_str += "%-15s %-10s %s\n"%("variable", "prev_E", "equal %.2f"%(50000.)) # set unreasonably high for first loop
+            inp_str += "%-15s %-10s %s\n"%("variable", "iter", "loop %i"%(max_iterations))
+            inp_str += "%-15s %s\n"%("label", "loop_min")
+            inp_str += "%-15s %s\n"%("min_style", min_style)
+            inp_str += "%-15s %s\n"%("minimize","1.0e-15 1.0e-15 10000 100000")
+#             inp_str += "%-15s %s\n"%("min_style", "fire")
+#             inp_str += "%-15s %s\n"%("minimize","1.0e-15 1.0e-15 10000 100000")
+            inp_str += "%-15s %-10s %s\n"%("variable", "tempstp", "equal $(step)")
+            inp_str += "%-15s %-10s %s\n"%("variable", "AtomMinStep", "equal ${tempstp}")
+            inp_str += "%-15s %-10s %s\n"%("variable", "temppe", "equal $(pe)")
+            inp_str += "%-15s %-10s %s\n"%("variable", "tempxy", "equal $(xy)")
+            inp_str += "%-15s %-10s %s\n"%("variable", "tempxz", "equal $(xz)")
+            inp_str += "%-15s %-10s %s\n"%("variable", "tempyz", "equal $(yz)")
+            inp_str += "%-15s %-10s %s\n"%("variable", "min_E", "equal abs(${prev_E}-${temppe})")
+            inp_str += "%-15s %s\n"%("print", "\"${iter},${AtomMinStep},${AtomMinStep}," + 
+                                              "$(pe),${min_E},${tempxy},${tempxz},${tempyz}\"" +
+                                              " append %s.min.csv screen no"%(self.name))
+
+            inp_str += "%-15s %s\n"%("if","\"${min_E} < ${min_eval}\" then \"jump SELF break_min\"")
+            inp_str += "%-15s %-10s %s\n"%("variable", "prev_E", "equal ${temppe}")
+            inp_str += "%-15s %s\n"%("next", "iter")
+            inp_str += "%-15s %s\n"%("jump", "SELF loop_min")
+            inp_str += "%-15s %s\n"%("label", "break_min")
+            inp_str += "%-15s %s\n"%("print", "\"$(vol),$(etotal),$(pe),$(ke)"+
+                                              ",$(ebond),$(eangle),$(edihed),$(eimp),$(evdwl),$(ecoul)\""+
+                                              " append %s.output.csv screen no"%(self.name))
+            inp_str += "%-15s %s\n"%("print", "\"$(etotal)\" append Energy_%s screen no"%(self.name))
+
+        if (self.options.relax):
+            min_style = "cg"
+            min_eval = 1e-11  # HKUST-1 will not minimize past 1e-11
+            max_iterations = 10000 # if the minimizer can't reach a minimum in this many steps,
+                                    # change the min_eval to something higher.
+            #inp_str += "%-15s %s\n"%("min_style","fire")
+            #inp_str += "%-15s %i %s\n"%("compute", 1, "all msd com yes")
+            #inp_str += "%-15s %-10s %s\n"%("variable", "Dx", "equal c_1[1]")
+            #inp_str += "%-15s %-10s %s\n"%("variable", "Dy", "equal c_1[2]")
+            #inp_str += "%-15s %-10s %s\n"%("variable", "Dz", "equal c_1[3]")
+            #inp_str += "%-15s %-10s %s\n"%("variable", "MSD", "equal c_1[4]")
+            #inp_str += "%-15s %s %s\n"%("fix", "output all print 1", "\"$(vol),$(cella),$(cellb),$(cellc),${Dx},${Dy},${Dz},${MSD}\"" +
+            #                                " file %s.min.csv title \"Vol,CellA,CellB,CellC,Dx,Dy,Dz,MSD\" screen no"%(self.name))
+            inp_str += "thermo 100\n"
+            inp_str += "thermo_style custom step etotal vol\n"
+            inp_str += "%-15s %s\n"%("print", "\"MinStep,CellMinStep,AtomMinStep,FinalStep,Energy,EDiff\"" + 
+                                              " file %s.min.csv screen no"%(self.name))
+            inp_str += "%-15s %-10s %s\n"%("variable", "min_eval", "equal %.2e"%(min_eval))
+            inp_str += "%-15s %-10s %s\n"%("variable", "prev_E", "equal %.2f"%(50000.)) # set unreasonably high for first loop
+            inp_str += "%-15s %-10s %s\n"%("variable", "iter", "loop %i"%(max_iterations))
+            inp_str += "%-15s %s\n"%("label", "loop_min")
+            inp_str += "%-15s %s\n"%("min_style", min_style)
+            inp_str += "%-15s %s\n"%("minimize","1.0e-15 1.0e-15 10000 100000")
+#             inp_str += "%-15s %s\n"%("min_style", "fire")
+#             inp_str += "%-15s %s\n"%("minimize","1.0e-15 1.0e-15 10000 100000")
+            inp_str += "%-15s %-10s %s\n"%("variable", "tempstp", "equal $(step)")
+            inp_str += "%-15s %-10s %s\n"%("variable", "AtomMinStep", "equal ${tempstp}")
+            inp_str += "%-15s %-10s %s\n"%("variable", "temppe", "equal $(pe)")
+            inp_str += "%-15s %-10s %s\n"%("variable", "tempxy", "equal $(xy)")
+            inp_str += "%-15s %-10s %s\n"%("variable", "tempxz", "equal $(xz)")
+            inp_str += "%-15s %-10s %s\n"%("variable", "tempyz", "equal $(yz)")
+            inp_str += "%-15s %-10s %s\n"%("variable", "min_E", "equal abs(${prev_E}-${temppe})")
+            inp_str += "%-15s %s\n"%("print", "\"${iter},${AtomMinStep},${AtomMinStep}," + 
+                                              "$(pe),${min_E},${tempxy},${tempxz},${tempyz}\"" +
+                                              " append %s.min.csv screen no"%(self.name))
+
+            inp_str += "%-15s %s\n"%("if","\"${min_E} < ${min_eval}\" then \"jump SELF break_min\"")
+            inp_str += "%-15s %-10s %s\n"%("variable", "prev_E", "equal ${temppe}")
+            inp_str += "%-15s %s\n"%("next", "iter")
+            inp_str += "%-15s %s\n"%("jump", "SELF loop_min")
+            inp_str += "%-15s %s\n"%("label", "break_min")
+            inp_str += "%-15s %s\n"%("print", "\"$(vol),$(etotal),$(pe),$(ke)"+
+                                              ",$(ebond),$(eangle),$(edihed),$(eimp),$(evdwl),$(ecoul)\""+
+                                              " append %s.output.csv screen no"%(self.name))
+            inp_str += "%-15s %s\n"%("print", "\"$(etotal)\" append Energy_%s screen no"%(self.name))
            # inp_str += "%-15s %s\n"%("unfix", "output") 
         # delete bond types etc, for molecules that are rigid
         for mol in sorted(self.molecule_types.keys()):
@@ -1395,6 +1502,7 @@ class LammpsSimulation(object):
             inp_str += "%-15s %i\n"%("run", self.options.nprodstp)
 
             inp_str += "%-15s %i\n"%("unfix", id) 
+
 
         if(self.options.bulk_moduli):
             min_style=True

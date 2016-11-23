@@ -1,6 +1,7 @@
 from uff import UFF_DATA
 from uff4mof import UFF4MOF_DATA
 from dreiding import DREIDING_DATA
+from uff_qeq import UFF_QEQ
 from uff_nonbonded import UFF_DATA_nonbonded
 from BTW import BTW_angles, BTW_dihedrals, BTW_opbends, BTW_atoms, BTW_bonds, BTW_charges
 from Dubbeldam import Dub_atoms, Dub_bonds, Dub_angles, Dub_dihedrals, Dub_impropers
@@ -663,6 +664,7 @@ class BTW_FF(ForceField):
         self.pair_in_data = False 
         self.keep_metal_geometry = False
         self.graph = None
+        self.qeq = False 
         # override existing arguments with kwargs
         for key, value in kwargs.items():
             setattr(self, key, value)
@@ -1157,6 +1159,7 @@ class MOF_FF(ForceField):
     def __init__(self, **kwargs):
         self.pair_in_data = False 
         self.keep_metal_geometry = False
+        self.qeq = False 
         self.graph = None 
         # override existing arguments with kwargs
         for key, value in kwargs.items():
@@ -1661,6 +1664,7 @@ class MOF_FF(ForceField):
 class FMOFCu(ForceField):
     def __init__(self, **kwargs):
         self.pair_in_data = False
+        self.qeq = False 
         self.keep_metal_geometry = False
         self.graph = None
         # override existing arguments with kwargs
@@ -2103,6 +2107,7 @@ class UFF(ForceField):
     def __init__(self,  **kwargs):
         self.pair_in_data = True
         self.keep_metal_geometry = False
+        self.qeq = False 
         self.graph = None
         # override existing arguments with kwargs
         for key, value in kwargs.items():
@@ -2524,6 +2529,12 @@ class UFF(ForceField):
                     print("ERROR: could not find the proper force field type for atom %i"%(data['index'])+
                             " with element: '%s'"%(data['element']))
                     sys.exit()
+        if self.qeq:
+            for node, data in self.graph.nodes_iter(data=True):
+                data['Xi'] =   UFF_QEQ[data['element']][0] 
+                data['Hard'] = UFF_QEQ[data['element']][1]*2 
+
+
 
 class Dreiding(ForceField):
 
@@ -2532,6 +2543,7 @@ class Dreiding(ForceField):
         self.h_bonding = h_bonding
         self.bondtype = 'harmonic'
         self.keep_metal_geometry = False
+        self.qeq = False 
         # override existing arguments with kwargs
         for key, value in kwargs.items():
             setattr(self, key, value)
@@ -3088,6 +3100,11 @@ class Dreiding(ForceField):
                 print("ERROR: could not find the proper force field type for atom %i"%(data['index'])+
                         " with element: '%s'"%(data['element']))
                 sys.exit()
+        if self.qeq:
+            for node, data in self.graph.nodes_iter(data=True):
+                data['Xi'] =   UFF_QEQ[data['element']][0] 
+                data['Hard'] = UFF_QEQ[data['element']][1]*2 
+
 
 class UFF4MOF(ForceField):
     """Parameterize the periodic material with the UFF4MOF parameters.
@@ -3096,6 +3113,7 @@ class UFF4MOF(ForceField):
     def __init__(self, **kwargs):
         self.pair_in_data = True
         self.keep_metal_geometry = False
+        self.qeq = False 
         self.graph = None 
         # override existing arguments with kwargs
         for key, value in kwargs.items():
@@ -3558,11 +3576,16 @@ class UFF4MOF(ForceField):
                         " with element: '%s'"%(data['element']))
                 sys.exit()
 
+        if self.qeq:
+            for node, data in self.graph.nodes_iter(data=True):
+                data['Xi'] =   UFF_QEQ[data['element']][0] 
+                data['Hard'] = UFF_QEQ[data['element']][1]*2 
 
 class Dubbeldam(ForceField):
 
     def __init__(self, graph=None, **kwargs):
         self.pair_in_data = True
+        self.qeq = False
         # override existing arguments with kwargs
         for key, value in kwargs.items():
             setattr(self, key, value)
