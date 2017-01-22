@@ -108,6 +108,14 @@ class Options(object):
                                       default=False,
                                       help="Request input files necessary for"
                                       + " atomic position relaxation. Default off")
+        simulation_group.add_argument("--pair-write", action="store_true", # Mohamad
+                                      dest="pair_write",
+                                      default=False,
+                                      help="Write requirements for annealing a structure")
+        simulation_group.add_argument("--str-anneal", action="store_true", # Mohamad
+                                      dest="stranneal",
+                                      default=False,
+                                      help="Write requirements for annealing a structure")
         simulation_group.add_argument("--rel-def", action="store_true",
                                       dest="reldef",
                                       default=False,

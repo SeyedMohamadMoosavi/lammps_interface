@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 """
+my version
+
 main.py
 
 the program starts here.
@@ -220,7 +222,7 @@ class LammpsSimulation(object):
         # mix yourself
 
         table_str = ""
-        if len(list(set(pot_names))) > 1 or (any(['buck' in i for i in list(set(pot_names))])):
+        if len(list(set(pot_names))) > 1 or (any(['buck' in i for i in list(set(pot_names))])) or (self.options.pair_write) :
             self.pair_in_data = False
             for (i, j) in itertools.combinations_with_replacement(nodes_list, 2):
                 n1, n2 = self.unique_atom_types[i], self.unique_atom_types[j]
@@ -1244,7 +1246,7 @@ class LammpsSimulation(object):
         if (self.options.minimize):
             box_min = "tri"
             min_style = "cg"
-            min_eval = 1e-11  # HKUST-1 will not minimize past 1e-11
+            min_eval = 2e-11  # HKUST-1 will not minimize past 1e-11
             max_iterations = 100000 # if the minimizer can't reach a minimum in this many steps,
                                     # change the min_eval to something higher.
             #inp_str += "%-15s %s\n"%("min_style","fire")
@@ -1296,11 +1298,150 @@ class LammpsSimulation(object):
             inp_str += "undump str_relax\n"
             inp_str += "undump relax\n"
 
+        if (self.options.stranneal):
+            box_min = "tri"
+            min_style = "cg"
+            min_eval = 2e-11  
+            max_iterations = 100000 # if the minimizer can't reach a minimum in this many steps,
+            annealing_T_start=550
+            annealing_T_final=10
+            inloop=10
+            outloop=10
+            scale_annealing=1.2
+            # Setting thermo
+            inp_str += "thermo 100\n"
+            inp_str += "thermo_style custom step temp etotal pe\n"
+            inp_str += "run 1\n"
+            # Setting for annealing
+            inp_str += "variable startT equal %4.2f\n"%annealing_T_start
+            inp_str += "variable finalT equal %4.2f\n"%annealing_T_final
+            inp_str += "variable inloop equal %i\n"%inloop
+            inp_str += "variable outloop equal %i\n"%outloop
+            inp_str += "variable lowestPE equal 5000000\n"
+            # Annealing loops
+            inp_str += "label       strainloop\n"
+            inp_str += "variable    a loop ${outloop}\n"
+            inp_str += "  label     temperatureloop\n"
+            inp_str += "  variable  b loop  ${inloop}\n"
+            inp_str += "    if \"${a}==1\" then \"jump SELF skip1\" & \n"
+            inp_str += "   else \"variable startT equal 550.00\"\n"
+            inp_str += "  \n"
+            inp_str += "  variable curT equal ${startT}+(${finalT}-${startT})/${inloop}*$b+($a-1)*0\n"
+            inp_str += "  velocity all create ${curT} 48324\n"
+            inp_str += "  fix 10 all nvt temp ${curT} ${curT} 100\n"
+            inp_str += "  variable iters equal 101000-$b*10000\n"
+            inp_str += "  run ${iters}\n"
+            inp_str += "  velocity all create 0 325\n"
+            inp_str += "  label skip1\n"
+            fix = self.fixcount() 
+            inp_str += "  fix             %i"%fix+" all box/relax tri 0.0 vmax 0.01\n"
+            inp_str += "  minimize        1.0e-15 1.0e-15 1 1\n"
+            inp_str += "  unfix           %i\n"%fix
+            fix = self.fixcount() 
+            inp_str += "  fix             %i all box/relax xy 0.0 yz 0.0 xz 0.0  vmax 0.01\n"%fix
+            inp_str += "  minimize        1.0e-15 1.0e-15 1000 1000\n"
+            inp_str += "  unfix           %i\n"%fix
+            inp_str += "  change_box         all x delta $(-xlo) $(-xlo) y delta $(-ylo) $(-ylo) z delta $(-zlo) $(-zlo) remap units box\n"
+            inp_str += "  next      b\n"
+            inp_str += "  jump      SELF temperatureloop\n"
+            inp_str += "label       break\n"
+            inp_str += "variable    b delete\n"
+            # Fully relax at the current stage
+            inp_str += "%-15s %s\n"%("min_style", min_style)
+            inp_str += "%-15s %-10s %s\n"%("variable", "min_eval", "equal %.2e"%(min_eval))
+            inp_str += "%-15s %-10s %s\n"%("variable", "prev_E", "equal %.2f"%(5000000.)) # set unreasonably high for first loop
+            inp_str += "%-15s %-10s %s\n"%("variable", "iter", "loop %i"%(max_iterations))
+            inp_str += "%-15s %s\n"%("label", "loop_min1")
+            fix = self.fixcount() 
+            inp_str += "%-15s %s\n"%("fix","%i all box/relax %s 0.0 vmax 0.01"%(fix, box_min))
+            inp_str += "%-15s %s\n"%("minimize","1.0e-15 1.0e-15 10000 100000")
+            inp_str += "%-15s %s\n"%("unfix", "%i"%fix)
+            inp_str += "%-15s %-10s %s\n"%("variable", "tempstp", "equal $(step)")
+            inp_str += "%-15s %-10s %s\n"%("variable", "CellMinStep", "equal ${tempstp}")
+            inp_str += "%-15s %s\n"%("minimize","1.0e-15 1.0e-15 10000 100000")
+            inp_str += "%-15s %-10s %s\n"%("variable", "AtomMinStep", "equal ${tempstp}")
+            inp_str += "%-15s %-10s %s\n"%("variable", "temppe", "equal $(pe)")
+            inp_str += "%-15s %-10s %s\n"%("variable", "min_E", "equal abs(${prev_E}-${temppe})")
+            inp_str += "%-15s %s\n"%("print", "\"${iter},${CellMinStep},${AtomMinStep},${AtomMinStep}," + 
+                                              "$(pe),${min_E}\"" +
+                                              " append %s.min.csv screen no"%(self.name))
+
+            inp_str += "%-15s %s\n"%("if","\"${min_E} < ${min_eval}\" then \"jump SELF break_min1\"")
+            inp_str += "%-15s %-10s %s\n"%("variable", "prev_E", "equal ${temppe}")
+            inp_str += "%-15s %s\n"%("next", "iter")
+            inp_str += "%-15s %s\n"%("jump", "SELF loop_min1")
+            inp_str += "%-15s %s\n"%("label", "break_min1")
+            
+            ### Print energy per Zinc only for ZIF study ###
+            inp_str += "group metals type 5\n"
+            inp_str += "variable nummetals equal count(metals)\n"
+            inp_str += "variable curpe equal $(pe)\n"
+            inp_str += "variable peZn equal ${curpe}/${nummetals} \n"
+            inp_str += "print \"!! Energy per Zinc at this step: ${peZn}\"\n"            
+            inp_str += "change_box  all x delta $(-xlo) $(-xlo) y delta $(-ylo) $(-ylo) z delta $(-zlo) $(-zlo) remap units box\n"
+            # Check if a it get closer to global minima in this round:
+            inp_str += "reset_timestep 0\n"
+            inp_str += "%-15s %s\n"%("if","\"${curpe} < ${lowestPE}\" then \"variable lowestPE equal ${curpe}\" &")
+            inp_str += "\"dump  tmp_relax all atom 1 tmp_structure.dump \" &\n"
+            inp_str += "\"run 0\" &\n"
+            inp_str += "\"undump tmp_relax\" &\n"
+            inp_str += "else  &\n"
+            inp_str +="\"read_dump   tmp_structure.dump 0 x y z box yes format native \" &\n"
+            inp_str += "\"print \'previous energy is lower, reading dump..\' \"\n"
+            # scale the box in three directions to let the rings to rotate and go to lower energy!
+            inp_str += "run 0\n"
+            inp_str += "variable curpe equal $(pe)\n"
+            inp_str += "print \"# Current potential energy is ${curpe}\"\n"            
+            inp_str += "change_box  all x scale %2.2f y scale %2.2f z scale %2.2f remap units box\n"%(scale_annealing,scale_annealing,scale_annealing)
+            inp_str += "next        a\n"
+            inp_str += "jump        SELF strainloop\n"
+
+            # Final fully relaxation of the structure at 0 K 
+            inp_str += "velocity all create 0 393427\n"
+            inp_str += "%-15s %s\n"%("min_style", min_style)
+            inp_str += "%-15s %s\n"%("print", "\"MinStep,CellMinStep,AtomMinStep,FinalStep,Energy,EDiff\"" + 
+                                              " file %s.min.csv screen no"%(self.name))
+            inp_str += "%-15s %-10s %s\n"%("variable", "min_eval", "equal %.2e"%(min_eval))
+            inp_str += "%-15s %-10s %s\n"%("variable", "prev_E", "equal %.2f"%(50000.)) # set unreasonably high for first loop
+            inp_str += "%-15s %-10s %s\n"%("variable", "iter", "loop %i"%(max_iterations))
+            inp_str += "%-15s %s\n"%("label", "loop_min")
+            
+            fix = self.fixcount() 
+            inp_str += "%-15s %s\n"%("fix","%i all box/relax %s 0.0 vmax 0.01"%(fix, box_min))
+            inp_str += "%-15s %s\n"%("minimize","1.0e-15 1.0e-15 10000 100000")
+            inp_str += "%-15s %s\n"%("unfix", "%i"%fix)
+            inp_str += "%-15s %-10s %s\n"%("variable", "tempstp", "equal $(step)")
+            inp_str += "%-15s %-10s %s\n"%("variable", "CellMinStep", "equal ${tempstp}")
+            inp_str += "%-15s %s\n"%("minimize","1.0e-15 1.0e-15 10000 100000")
+            inp_str += "%-15s %-10s %s\n"%("variable", "AtomMinStep", "equal ${tempstp}")
+            inp_str += "%-15s %-10s %s\n"%("variable", "temppe", "equal $(pe)")
+            inp_str += "%-15s %-10s %s\n"%("variable", "min_E", "equal abs(${prev_E}-${temppe})")
+            inp_str += "%-15s %s\n"%("print", "\"${iter},${CellMinStep},${AtomMinStep},${AtomMinStep}," + 
+                                              "$(pe),${min_E}\"" +
+                                              " append %s.min.csv screen no"%(self.name))
+
+            inp_str += "%-15s %s\n"%("if","\"${min_E} < ${min_eval}\" then \"jump SELF break_min\"")
+            inp_str += "%-15s %-10s %s\n"%("variable", "prev_E", "equal ${temppe}")
+            inp_str += "%-15s %s\n"%("next", "iter")
+            inp_str += "%-15s %s\n"%("jump", "SELF loop_min")
+            inp_str += "%-15s %s\n"%("label", "break_min")
+
+
+            inp_str += "reset_timestep 0\n"
+            # MOHAMAD: dump the relaxed structure
+            inp_str += "dump  str_relax all atom 1 relaxed_structure.dump\n"
+            inp_str += "dump            relax all custom 1 relaxed.lammpstrj element x y z\n"
+            inp_str += "%-15s %s\n"%("dump_modify", "relax element %s"%(
+                                     " ".join([self.graph.node[self.unique_atom_types[key]]['element'] 
+                                                for key in sorted(self.unique_atom_types.keys())])))
+            inp_str += "run 0\n"
+            inp_str += "undump str_relax\n"
+            inp_str += "undump relax\n"
 
         if (self.options.reldef):
             inp_str +="read_dump   relaxed_structure.dump 0 x y z box yes format native\n"
             min_style = "cg"
-            min_eval = 1e-11  # HKUST-1 will not minimize past 1e-11
+            min_eval = 1e-9  # HKUST-1 will not minimize past 1e-11
             max_iterations = 10000 # if the minimizer can't reach a minimum in this many steps,
                                     # change the min_eval to something higher.
             #inp_str += "%-15s %s\n"%("min_style","fire")

@@ -2736,7 +2736,7 @@ class Dreiding(ForceField):
         # b)
         elif(((b_hyb in sp2) and (c_hyb == "sp3"))or(
             (b_hyb == "sp3") and (c_hyb in sp2))):
-            V = 1.0
+            V = 1.0 
             n = 6
             phi0 = 0.0
             # i) special case.. 
@@ -3081,6 +3081,7 @@ class Dreiding(ForceField):
                         for n in self.graph.neighbors(node):
                             if self.graph.node[n]['element'] in electro_neg_atoms:
                                 self.graph.node[n]['h_bond_donor'] = True
+                                self.graph.node[n]['force_field_type'] += "_HB"
                                 data['force_field_type'] = "H__HB"
 
                 elif data['element'] in halides:
@@ -3499,10 +3500,7 @@ class UFF4MOF(ForceField):
                         data['force_field_type'] = "Zn3f2"
                         # change the bond orders to 0.5 as per the paper
                         for n in self.graph.neighbors(node):
-                            if self.graph.node[n]['special_flag'] == "O_z_Zn4O":
-                                self.graph[node][n]['order'] = 1.0
-                            else:
-                                self.graph[node][n]['order'] = 0.5
+                            self.graph[node][n]['order'] = 0.5
                     elif data['special_flag'] == "C_Zn4O":
                         data['force_field_type'] = "C_R"
                         oxy_neighbours = [n for n in self.graph.neighbors(node) if 
