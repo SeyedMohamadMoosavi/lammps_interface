@@ -7,7 +7,8 @@ from BTW import BTW_angles, BTW_dihedrals, BTW_opbends, BTW_atoms, BTW_bonds, BT
 from Dubbeldam import Dub_atoms, Dub_bonds, Dub_angles, Dub_dihedrals, Dub_impropers
 #from FMOFCu import FMOFCu_angles, FMOFCu_dihedrals, FMOFCu_opbends, FMOFCu_atoms, FMOFCu_bonds
 from MOFFF import MOFFF_angles, MOFFF_dihedrals, MOFFF_opbends, MOFFF_atoms, MOFFF_bonds
-from water_models import SPC_E_atoms, TIP3P_atoms, TIP4P_atoms, TIP5P_atoms 
+from water_models import SPC_E_atoms, TIP3P_atoms, TIP4P_atoms, TIP5P_atoms
+from gas_models import EPM2_atoms, EPM2_angles
 from lammps_potentials import BondPotential, AnglePotential, DihedralPotential, ImproperPotential, PairPotential
 from atomic import METALS
 import math
@@ -409,8 +410,6 @@ class UserFF(ForceField):
         # Warn user about any unique bond, angle, etc. found that have not 
         # been specified in user_input.txt
         pass
-
-
 
     def map_user_to_unique_atom(self, descriptor):
         for key, atom in list(self.unique_atom_types.items()):
@@ -2197,11 +2196,16 @@ class UFF(ForceField):
         if (self.keep_metal_geometry) and (b_data['atomic_number'] in METALS):
             theta0 = self.graph.compute_angle_between(a, b, c)
             # should put this angle in the general - non-linear case
+            # unless the angle is 0 or 180 deg - then linear case.
+            # here the K value will be scaled by the number of neighbors
             angle_type = "None"
+            # note, coefficient might be too strong here, if the metal
+            # is octahedral, for example, kappa = ka/16
+            if np.allclose(theta0, 180.0, atol=0.1):
+                angle_type = 'linear'
 
-        cosT0 = math.cos(theta0*DEG2RAD)
-        sinT0 = math.sin(theta0*DEG2RAD)
-
+        cosT0 = np.cos(theta0*DEG2RAD)
+        sinT0 = np.sin(theta0*DEG2RAD)
         c2 = 1.0 / (4.0*sinT0*sinT0)
         c1 = -4.0 * c2 * cosT0
         c0 = c2 * (2.0*cosT0*cosT0 + 1.0)
@@ -2488,8 +2492,8 @@ class UFF(ForceField):
                     elif data['hybridization'] == "aromatic":
                         data['force_field_type'] = "%s_R"%data['element']
                         # fix to make the angle 120
-                        if data['element'] == "O":
-                            data['force_field_type'] = "O_2"
+                        #if data['element'] == "O":
+                        #    data['force_field_type'] = "O_2"
                     elif data['hybridization'] == "sp2":
                         data['force_field_type'] = "%s_2"%data['element']
                     elif data['hybridization'] == "sp":
@@ -2510,7 +2514,11 @@ class UFF(ForceField):
                         valency = 3
                     for j in ffs:
                         if data['element'] == j[:2].strip("_"):
-                            if valency == int(j[2]):
+                            try:
+                                if valency == int(j[2]):
+                                    data['force_field_type'] = j
+                            except IndexError:
+                                # no valency for this atom
                                 data['force_field_type'] = j
 
             if data['force_field_type'] is None:
@@ -2581,18 +2589,23 @@ class Dreiding(ForceField):
         
         if (self.keep_metal_geometry) and (n1_data['atomic_number'] in METALS
             or n2_data['atomic_number'] in METALS):
-            alpha = order * np.sqrt(K/2./D)
-            data['potential'] = BondPotential.Morse()
-            data['potential'].D = D 
-            data['potential'].alpha = alpha
-            data['potential'].R = data['length']
+
+            if self.bondtype.lower() == "harmonic":
+                data['potential'] = BondPotential.Harmonic()
+                data['potential'].K = K/2.
+                data['potential'].R0 = data['length'] 
+
+            elif self.bondtype.lower() == "morse":
+                alpha = order * np.sqrt(K/2./D)
+                data['potential'] = BondPotential.Morse()
+                data['potential'].D = D 
+                data['potential'].alpha = alpha
+                data['potential'].R = data['length']
             return 1
 
         if self.bondtype.lower() == 'harmonic':
-
             data['potential'] = BondPotential.Harmonic()
             data['potential'].K = K/2.
-
             data['potential'].R0 = Re
 
         elif self.bondtype.lower() == 'morse':
@@ -2780,7 +2793,7 @@ class Dreiding(ForceField):
                     # Need to make sure this isn't part of the same ring.
                     if c in cycle:
                         b_arom = False
-                        print("Warning: two resonant atoms "+
+                        print("WARNING: two resonant atoms "+
                               "%s and %s"%(b_data['ciflabel'], c_data['ciflabel'])+
                               "in the same ring have a bond order of 1.0! "
                               "This will likely yield unphysical characteristics"+
@@ -2792,7 +2805,7 @@ class Dreiding(ForceField):
                     # Need to make sure this isn't part of the same ring.
                     if b in cycle:
                         c_arom = False
-                        print("Warning: two resonant atoms "+
+                        print("WARNING: two resonant atoms "+
                               "%s and %s"%(b_data['ciflabel'], c_data['ciflabel'])+
                               "in the same ring have a bond order of 1.0! "
                               "This will likely yield unphysical characteristics"+
@@ -3489,8 +3502,6 @@ class UFF4MOF(ForceField):
         halides = ["F", "Cl", "Br", "I"]
         for node, data in self.graph.nodes_iter(data=True):
             special = 'special_flag' in data
-
-
             if data['force_field_type'] is None:
                 if special:
                     # Zn4O case TODO(pboyd): generalize these cases...
@@ -3501,12 +3512,21 @@ class UFF4MOF(ForceField):
                         # change the bond orders to 0.5 as per the paper
                         for n in self.graph.neighbors(node):
                             self.graph[node][n]['order'] = 0.5
+<<<<<<< HEAD
+=======
+                            # woops! this is correct only for the M3O type SBUs
+                            #if self.graph.node[n]['special_flag'] == "O_z_Zn4O":
+                            #    self.graph[node][n]['order'] = 1.0
+                            #else:
+                            #    self.graph[node][n]['order'] = 0.5
+>>>>>>> upstream/master
                     elif data['special_flag'] == "C_Zn4O":
                         data['force_field_type'] = "C_R"
-                        oxy_neighbours = [n for n in self.graph.neighbors(node) if 
-                                            self.graph.node[n]['element'] == "O"]
-                        for n in oxy_neighbours:
-                            self.graph[node][n]['order'] = 1.5
+                        for n in self.graph.neighbors(node):
+                            if self.graph.node[n]['element'] == "O":
+                                self.graph[node][n]['order'] = 1.5 
+                            elif self.graph.node[n]['element'] == "C":
+                                self.graph[node][n]['order'] = 1
                     elif data['special_flag'] == "O_c_Zn4O":
                         data['force_field_type'] = 'O_2'
                     
@@ -3525,6 +3545,8 @@ class UFF4MOF(ForceField):
                         for n in self.graph.neighbors(node):
                             if self.graph.node[n]['element'] == "O":
                                 self.graph[node][n]['order'] = 1.5 
+                            elif self.graph.node[n]['element'] == "C":
+                                self.graph[node][n]['order'] = 1
 
                     # Zn Paddlewheel TODO(pboyd): generalize these cases...
                     elif data['special_flag'] == "O1_Zn_pdw" or data['special_flag'] == "O2_Zn_pdw":
@@ -3541,7 +3563,40 @@ class UFF4MOF(ForceField):
                         for n in self.graph.neighbors(node):
                             if self.graph.node[n]['element'] == "O":
                                 self.graph[node][n]['order'] = 1.5 
+                            elif self.graph.node[n]['element'] == "C":
+                                self.graph[node][n]['order'] = 1
+                    
+                    # Al Pillar TODO(pboyd): generalize these cases...
+                    elif data['special_flag'] == "O_c_Al_pillar":
+                        data['force_field_type'] = 'O_2'
+                    elif data['special_flag'] == "O_z_Al_pillar":
+                        data['force_field_type'] = 'O_2'
+                    elif data['special_flag'] == "H_Al_pillar":
+                        data['force_field_type'] = 'H_'
+                    elif data['special_flag'] == "Al_pillar":
+                        data['force_field_type'] = 'Al6+3'
+                    elif data['special_flag'] == "C_Al_pillar":
+                        data['force_field_type'] = 'C_R'
+                        for n in self.graph.neighbors(node):
+                            if self.graph.node[n]['element'] == "O":
+                                self.graph[node][n]['order'] = 1.5 
+                            elif self.graph.node[n]['element'] == "C":
+                                self.graph[node][n]['order'] = 1
 
+                    # V Pillar TODO(pboyd): generalize these cases...
+                    elif data['special_flag'] == "O_c_V_pillar":
+                        data['force_field_type'] = 'O_2'
+                    elif data['special_flag'] == "O_z_V_pillar":
+                        data['force_field_type'] = 'O_2'
+                    elif data['special_flag'] == "V_pillar":
+                        data['force_field_type'] = 'V6+3'
+                    elif data['special_flag'] == "C_V_pillar":
+                        data['force_field_type'] = 'C_R'
+                        for n in self.graph.neighbors(node):
+                            if self.graph.node[n]['element'] == "O":
+                                self.graph[node][n]['order'] = 1.5 
+                            elif self.graph.node[n]['element'] == "C":
+                                self.graph[node][n]['order'] = 1
 
                 elif data['element'] in organics:
                     if data['hybridization'] == "sp3":
@@ -4160,12 +4215,12 @@ class TIP4P(ForceField, TIP4P_Water):
             data['mass'] = TIP4P_atoms[fftype][0] 
             data['charge'] = TIP4P_atoms[fftype][3] 
 
-class TIP5P(ForceField, TIP5P_Water):
+class TIP5P(ForceField):
     def __init__(self, graph=None, **kwargs):
         self.pair_in_data = True
         for key, value in kwargs.items():
             setattr(self, key, value)
-
+        
         if (graph is not None):
             self.graph = graph
             self.graph.rigid = True
@@ -4281,4 +4336,112 @@ class TIP5P(ForceField, TIP5P_Water):
                 sys.exit()
             data['force_field_type'] = fftype 
             data['mass'] = TIP5P_atoms[fftype][0] 
-            data['charge'] = TIP5P_atoms[fftype][3] 
+            data['charge'] = TIP5P_atoms[fftype][3]
+
+class EPM2_CO2(ForceField):
+
+    def __init__(self, graph=None, **kwargs):
+        self.pair_in_data = True
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+        
+        if (graph is not None):
+            self.graph = graph
+            self.graph.rigid = True
+            self.detect_ff_terms()
+            self.compute_force_field_terms()
+
+    def bond_term(self, edge):
+        """Harmonic term
+        
+        E = 0.5 * K * (R - Req)^2
+        
+        just a placeholder in LAMMPS.
+        The bond is rigid 
+        therefore an unambiguous extra flag must be
+        added here to ensure the potential is not 
+        grouped with identical (however unlikely) potentials
+        which are not rigid.
+
+        """
+        n1, n2, data = edge
+
+        n1data = self.graph.node[n1]
+        n2data = self.graph.node[n2]
+        data['potential'] = BondPotential.Harmonic()
+        data['potential'].R0 = 1.149 
+        data['potential'].K = 450000.0 # strong bond potential to ensure that the structure
+                                       # will not deviate far from its intended form
+                                       # during a minimization
+        data['potential'].special_flag = "rigid"
+        return 1
+
+    def angle_term(self, angle):
+        """Harmonic angle term.
+
+        E = 0.5 * K * (theta - theta0)^2
+
+        Can be rigid or not with EPM2
+
+        """
+        a, b, c, data = angle
+        a_data, b_data, c_data = self.graph.node[a], self.graph.node[b], self.graph.node[c] 
+        atype = a_data['force_field_type']
+        btype = b_data['force_field_type']
+        ctype = c_data['force_field_type']
+       
+        assert (b_data['element'] == "C")
+        assert (a_data['element'] == "O")
+        assert (c_data['element'] == "O")
+        data['potential'] = AnglePotential.Harmonic()
+        data['potential'].theta0 = EPM2_angles["_".join([atype,btype,ctype])][1]  
+        data['potential'].K = EPM2_angles["_".join([atype,btype,ctype])][0]/2. 
+        data['potential'].special_flag = "rigid"
+        return 1
+
+    def dihedral_term(self, dihedral):
+        """
+        No dihedral potential in EPM2 CO2 model.
+
+        """
+        return None
+
+    def improper_term(self, improper):
+        """
+        No improper potential in EPM2 CO2 model.
+
+        """
+        return None
+    
+    def pair_terms(self, node, data, cutoff):
+        """ 
+        Lennard - Jones potential for Cx and Ox.
+
+        """
+        data['pair_potential'] = PairPotential.LjCutCoulLong()
+        data['pair_potential'].eps = EPM2_atoms[data['force_field_type']][2]
+        data['pair_potential'].sig = EPM2_atoms[data['force_field_type']][1]
+        data['pair_potential'].cutoff = cutoff
+
+    def special_commands(self):
+        st = [
+              "%-15s %s"%("pair_modify", "tail yes")
+             ] 
+        return st
+
+    def detect_ff_terms(self):
+        """CO2 consists of C and O, not too difficult. 
+
+        """
+        for node, data in self.graph.nodes_iter(data=True):
+            if data['element'] == "O":
+                fftype = "Ox"
+            elif data['element'] == "C":
+                fftype = "Cx"
+            else: 
+                print("ERROR: could not find the proper force field type for atom %i"%(data['index'])+
+                        " with element: '%s'"%(data['element']))
+                sys.exit()
+            data['force_field_type'] = fftype 
+            data['mass'] = EPM2_atoms[fftype][0] 
+            data['charge'] = EPM2_atoms[fftype][3]

@@ -21,6 +21,8 @@ InorganicCluster = {
         'Cr':{'Cr_tri': nx.Graph(name='Cr_tri') # taken from doi:
               },
         'V':{'V_pillar': nx.Graph(name='V_pillar') # taken from doi:
+              },
+        'Al':{'Al_pillar': nx.Graph(name='Al_pillar') # taken from doi:
               }
         }
 
@@ -888,42 +890,42 @@ InorganicCluster['Cr']['Cr_tri'].add_nodes_from([
 
 InorganicCluster['V']['V_pillar'].add_nodes_from([
     (1, {'element':'O',
-         'special_flag':'O',
+         'special_flag':'O_c_V_pillar',
          'cartesian_coordinates':np.array([-3.335000,1.411000,1.192000])
          }
        ),
     (2, {'element':'O',
-         'special_flag':'O',
+         'special_flag':'O_c_V_pillar',
          'cartesian_coordinates':np.array([-1.088000,-1.401000,1.345000])
          }
        ),
     (3, {'element':'O',
-         'special_flag':'O',
+         'special_flag':'O_c_V_pillar',
          'cartesian_coordinates':np.array([0.073000,-1.411000,-1.136000])
          }
        ),
     (4, {'element':'C',
-         'special_flag':'C',
+         'special_flag':'C_V_pillar',
          'cartesian_coordinates':np.array([-2.221000,-1.831000,1.655000])
          }
        ),
     (5, {'element':'O',
-         'special_flag':'O',
+         'special_flag':'O_c_V_pillar',
          'cartesian_coordinates':np.array([-1.088000,1.401000,1.345000])
          }
        ),
     (6, {'element':'O',
-         'special_flag':'O',
+         'special_flag':'O_c_V_pillar',
          'cartesian_coordinates':np.array([0.073000,1.411000,-1.136000])
          }
        ),
     (7, {'element':'C',
-         'special_flag':'C',
+         'special_flag':'C_V_pillar',
          'cartesian_coordinates':np.array([-2.221000,1.831000,1.655000])
          }
        ),
     (8, {'element':'O',
-         'special_flag':'O',
+         'special_flag':'O_c_V_pillar',
          'cartesian_coordinates':np.array([-3.335000,-1.411000,1.192000])
          }
        ),
@@ -938,22 +940,22 @@ InorganicCluster['V']['V_pillar'].add_nodes_from([
           }
         ),
     (11, {'element':'O',
-          'special_flag':'O',
+          'special_flag':'O_c_V_pillar',
           'cartesian_coordinates':np.array([2.321000,1.401000,-1.289000])
           }
         ),
     (12, {'element':'C',
-          'special_flag':'C',
+          'special_flag':'C_V_pillar',
           'cartesian_coordinates':np.array([1.187000,1.831000,-1.599000])
           }
         ),
     (13, {'element':'O',
-          'special_flag':'O',
+          'special_flag':'O_c_V_pillar',
           'cartesian_coordinates':np.array([2.321000,-1.401000,-1.289000])
           }
         ),
     (14, {'element':'C',
-          'special_flag':'C',
+          'special_flag':'C_V_pillar',
           'cartesian_coordinates':np.array([1.187000,-1.831000,-1.599000])
           }
         ),
@@ -969,6 +971,60 @@ InorganicCluster['V']['V_pillar'].add_nodes_from([
         )
     ])
 
+
+InorganicCluster['Al']['Al_pillar'].add_nodes_from([
+    (1, {'element':'O',
+         'special_flag':'O_c_Al_pillar',
+         'cartesian_coordinates':np.array([-1.215000,1.107000,-0.732000])
+         }
+       ),
+    (2, {'element':'O',
+         'special_flag':'O_c_Al_pillar',
+         'cartesian_coordinates':np.array([1.383000,-1.106000,-0.464000])
+         }
+       ),
+    (3, {'element':'O',
+         'special_flag':'O_c_Al_pillar',
+         'cartesian_coordinates':np.array([1.383000,1.107000,-0.464000])
+         }
+       ),
+    (4, {'element':'O',
+         'special_flag':'O_c_Al_pillar',
+         'cartesian_coordinates':np.array([-1.215000,-1.106000,-0.732000])
+         }
+       ),
+    (5, {'element':'Al',
+         'special_flag':'Al_pillar',
+         'cartesian_coordinates':np.array([-0.102000,-1.657000,0.608000])
+         }
+       ),
+    (6, {'element':'O',
+         'special_flag':'O_z_Al_pillar',
+         'cartesian_coordinates':np.array([-0.102000,0.000000,1.473000])
+         }
+       ),
+    (7, {'element':'C',
+         'special_flag':'C_Al_pillar',
+         'cartesian_coordinates':np.array([2.005000,0.000000,-0.744000])
+         }
+       ),
+    (8, {'element':'C',
+         'special_flag':'C_Al_pillar',
+         'cartesian_coordinates':np.array([-1.849000,0.000000,-0.976000])
+         }
+       ),
+    (9, {'element':'H',
+         'special_flag':'H_Al_pillar',
+         'cartesian_coordinates':np.array([-0.121000,-0.071000,2.580000])
+         }
+       )#,
+    #(10, {'element':'Al',
+    #      'special_flag':'Al_pillar',
+    #      'cartesian_coordinates':np.array([-0.102000,1.658000,0.608000])
+    #      }
+    #    )
+    ])
+    
 OrganicCluster['N']['Adenine'].add_nodes_from([
     (1, {'element':'C',
          'special_flag':'C',
@@ -1492,6 +1548,7 @@ add_distance_matrix(InorganicCluster['Zn']['Kuratowski'])
 add_distance_matrix(InorganicCluster['Zr']['Zr_UiO'])
 add_distance_matrix(InorganicCluster['Cr']['Cr_tri'])
 add_distance_matrix(InorganicCluster['V']['V_pillar'])
+add_distance_matrix(InorganicCluster['Al']['Al_pillar'])
 add_distance_matrix(OrganicCluster['N']['Adenine'])
 add_distance_matrix(OrganicCluster['N']['Thymine'])
 add_distance_matrix(OrganicCluster['N']['CarboxylateImidazolate'])

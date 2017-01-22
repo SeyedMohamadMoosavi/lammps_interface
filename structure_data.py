@@ -77,6 +77,36 @@ class MolecularGraph(nx.Graph):
     def edges_iter2(self, **kwargs):
         for n1, n2, d in self.edges_iter(**kwargs):
             yield (self.sorted_edge_dict[(n1, n2)][0], self.sorted_edge_dict[(n1,n2)][1], d)
+    
+    def count_dihedrals(self):
+        count = 0
+        for n1, n2, data in self.edges_iter(data=True):
+            try:
+                for dihed in data['dihedrals'].keys():
+                    count += 1
+            except KeyError:
+                pass
+        return count
+
+    def count_angles(self):
+        count = 0
+        for node, data in self.nodes_iter(data=True):
+            try:
+                for angle in data['angles'].keys():
+                    count += 1
+            except KeyError:
+                pass
+        return count
+
+    def count_impropers(self):
+        count = 0
+        for node, data in self.nodes_iter(data=True):
+            try:
+                for angle in data['impropers'].keys():
+                    count += 1
+            except KeyError:
+                pass
+        return count
 
     def reorder_labels(self, reorder_dic):
         """Re-order the labels of the nodes so that LAMMPS doesn't complain.
@@ -87,11 +117,12 @@ class MolecularGraph(nx.Graph):
 
         """
 
-        old_nodes = list(self.nodes_iter(data=True))
+        old_nodes = sorted([(i,self.node[i]) for i in self.nodes()])
+        #old_nodes = list(self.nodes_iter(data=True))
         old_edges = list(self.edges_iter2(data=True))
         for node, data in old_nodes:
+            
             if 'angles' in data:
-                
                 ang_data = list(data['angles'].items())
                 for (a,c), val in ang_data:
                     data['angles'].pop((a,c))
@@ -164,7 +195,6 @@ class MolecularGraph(nx.Graph):
         kwargs.update({'tabulated_potential':False})
         kwargs.update({'table_potential':None})
         if set(orig_keys) & set(charge_keywords):
-
             for key in charge_keywords:
                 try:
                     kwargs['charge'] = float(kwargs[key])
@@ -278,13 +308,22 @@ class MolecularGraph(nx.Graph):
             dist = self.distance_matrix[i1,i2]
             tempsf = scale_factor
             # probably a better way to fix these kinds of issues..
-            if (set("F") < elements) and  (len(elements & metals)): 
+            if (set("F") < elements) and  (elements & metals): 
                 tempsf = 0.8
 
-            if (set("O") < elements) and (len(elements & metals)):
+            if (set("O") < elements) and (elements & metals):
                 tempsf = 0.85
-            
-            if dist*tempsf < rad and not alkali & elements:
+            # fix for water particle recognition.
+            if(set(["O", "H"]) <= elements):
+                tempsf = 0.8
+            # very specific fix for Michelle's amine appended MOF
+            if(set(["N","H"]) <= elements):
+                tempsf = 0.67
+            if(set(["Mg","N"]) <= elements):
+                tempsf = 0.80
+            if(set(["C","H"]) <= elements):
+                tempsf = 0.80
+            if dist*tempsf < rad and not (alkali & elements):
 
                 flag = self.compute_bond_image_flag(n1, n2, cell)
                 self.sorted_edge_dict.update({(n1,n2): (n1, n2), (n2, n1):(n1, n2)})
@@ -335,7 +374,11 @@ class MolecularGraph(nx.Graph):
 
         a = np.arccos(np.dot(v1, v2))
         if np.isnan(a):
-            a = 0
+            if np.allclose((v1 + v2),np.zeros(3)):
+                a = 180
+            else:
+                a = 0
+
         angle = a / DEG2RAD
         return angle
     
@@ -844,8 +887,16 @@ class MolecularGraph(nx.Graph):
                 reference_nodes.append(node)
         
         no_cluster = []
-        while reference_nodes:
-            node = reference_nodes.pop() 
+        #FIXME(pboyd): This routine doesn't work for finding 1-D rod SBUs.
+        # At each step the atoms found that belong to an SBU are deleted
+        # to improve the search efficiency. In 1-D rod SBUs there are 
+        # repeating elements in the 'discretized' version used to discover
+        # the rod in a MOF, so in some cases only a fragment of the rod
+        # is found. This results in the wrong force field types being
+        # assigned to these atoms (UFF4MOF).
+        for node in reference_nodes:
+        #while reference_nodes:
+            #node = reference_nodes.pop() 
             data = self.node[node]
             possible_clusters = {}
             toln = tol
@@ -890,18 +941,18 @@ class MolecularGraph(nx.Graph):
                             cluster_found = True
                             print("Found %s"%(name))
                             store_sbus.setdefault(name, []).append([i for (i,j) in clique])
-                            break
+                            #break
 
-                    if(cluster_found):
-                        for n in neighbour_nodes:
-                            try:
-                                reference_nodes.pop(reference_nodes.index(n))
-                            except:
-                                pass
-                        break
-                    else:
-                        # put node back into the pool
-                        reference_nodes.append(node)
+                    #if(cluster_found):
+                    #    for n in neighbour_nodes:
+                    #        try:
+                    #            reference_nodes.pop(reference_nodes.index(n))
+                    #        except:
+                    #            pass
+                    #    break
+                    #else:
+                    #    # put node back into the pool
+                    #    reference_nodes.append(node)
                 if not (cluster_found):
                     no_cluster.append(data['element'])
             except KeyError:
@@ -965,7 +1016,6 @@ class MolecularGraph(nx.Graph):
                 # angle check
                 try:
                     for (a, c), val in list(data['angles'].items()):
-
                         aid, cid = offset + a, offset + c
                         e_ba = graph_image[node][aid]
                         e_bc = graph_image[node][cid]
@@ -978,9 +1028,9 @@ class MolecularGraph(nx.Graph):
                         if order_bc != (node, cid) and e_bc['symflag'] != '.':
                             bc_symflag = "1_%i%i%i"%(tuple(np.array([10,10,10]) - np.array([int(j) for j in e_bc['symflag'][2:]]))) 
                         os_a = self.img_offset(cells, newcell, maxcell, ba_symflag) * unitatomlen
-                        os_b = self.img_offset(cells, newcell, maxcell, bc_symflag) * unitatomlen
+                        os_c = self.img_offset(cells, newcell, maxcell, bc_symflag) * unitatomlen
                         data['angles'].pop((a,c))
-                        data['angles'][(a + os_a, c + os_b)] = val
+                        data['angles'][(a + os_a, c + os_c)] = val
 
                 except KeyError:
                     # no angles for n1
@@ -1371,25 +1421,25 @@ def write_RASPA_CIF(graph, cell):
                                 CIF.atom_type_partial_charge(data['charge']))
     # bond block
     # must re-sort them based on bond type (Mat Sudio)
-    tosort = [(data['order'], (n1, n2, data)) for n1, n2, data in graph.edges_iter2(data=True)]
-    for ord, (n1, n2, data) in sorted(tosort, key=lambda tup: tup[0]):
-        type = CCDC_BOND_ORDERS[data['order']]
-        dist = data['length'] 
-        sym = data['symflag']
+    #tosort = [(data['order'], (n1, n2, data)) for n1, n2, data in graph.edges_iter2(data=True)]
+    #for ord, (n1, n2, data) in sorted(tosort, key=lambda tup: tup[0]):
+    #    type = CCDC_BOND_ORDERS[data['order']]
+    #    dist = data['length'] 
+    #    sym = data['symflag']
 
 
-        label1 = "%s%i"%(graph.node[n1]['element'], n1)
-        label2 = "%s%i"%(graph.node[n2]['element'], n2) 
-        c.add_data("bonds", _geom_bond_atom_site_label_1=
-                                    CIF.geom_bond_atom_site_label_1(label1))
-        c.add_data("bonds", _geom_bond_atom_site_label_2=
-                                    CIF.geom_bond_atom_site_label_2(label2))
-        c.add_data("bonds", _geom_bond_distance=
-                                    CIF.geom_bond_distance(dist))
-        c.add_data("bonds", _geom_bond_site_symmetry_2=
-                                    CIF.geom_bond_site_symmetry_2(sym))
-        c.add_data("bonds", _ccdc_geom_bond_type=
-                                    CIF.ccdc_geom_bond_type(type))
+    #    label1 = "%s%i"%(graph.node[n1]['element'], n1)
+    #    label2 = "%s%i"%(graph.node[n2]['element'], n2) 
+    #    c.add_data("bonds", _geom_bond_atom_site_label_1=
+    #                                CIF.geom_bond_atom_site_label_1(label1))
+    #    c.add_data("bonds", _geom_bond_atom_site_label_2=
+    #                                CIF.geom_bond_atom_site_label_2(label2))
+    #    c.add_data("bonds", _geom_bond_distance=
+    #                                CIF.geom_bond_distance(dist))
+    #    c.add_data("bonds", _geom_bond_site_symmetry_2=
+    #                                CIF.geom_bond_site_symmetry_2(sym))
+    #    c.add_data("bonds", _ccdc_geom_bond_type=
+    #                                CIF.ccdc_geom_bond_type(type))
     
     print('Output cif file written to %s.cif'%c.name)
     file = open("%s.cif"%c.name, "w")
