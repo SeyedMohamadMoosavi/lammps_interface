@@ -1406,7 +1406,7 @@ class LammpsSimulation(object):
             # TODO: add lammpstrj here!
             inp_str += "dump            relax all custom 1 relaxed.lammpstrj element x y z\n"
             inp_str += "%-15s %s\n"%("dump_modify", "relax element %s"%(
-                                     " ".join([self.graph.node[self.unique_atom_types[key]]['element'] 
+                                     " ".join([self.unique_atom_types[key][1]['element'] 
                                                 for key in sorted(self.unique_atom_types.keys())])))
             inp_str += "run 0\n"
             inp_str += "undump str_relax\n"
@@ -1414,17 +1414,16 @@ class LammpsSimulation(object):
 
         if (self.options.stranneal):
             Zn_key=0
-            if(len(self.unique_atom_types.keys()) > 0):
-                for key in sorted(self.unique_atom_types.keys()):
-                    if self.graph.node[self.unique_atom_types[key]]['force_field_type'][0:2]=='Zn':
-                        Zn_key=key
-                        break
+            for key in sorted(self.unique_atom_types.keys()):
+                if self.unique_atom_types[key][1]['force_field_type'][0:2]=='Zn':
+                    Zn_key=key
+                    break
 
             inp_str += "group metals type %i\n"%Zn_key
             inp_str += "variable nummetals equal count(metals)\n"
             box_min = "tri"
             min_style = "cg"
-            min_eval = 1e+1  
+            min_eval = 1e-10  
             max_iterations = 100000 # if the minimizer can't reach a minimum in this many steps,
             annealing_T_start=550
             annealing_T_final=10
@@ -1432,7 +1431,7 @@ class LammpsSimulation(object):
             outloop=11
             max_iter=101000
             decrease_iters=10000
-            scale_annealing=1.2
+            scale_annealing=1.1
             # Setting thermo
             inp_str += "thermo 100\n"
             inp_str += "thermo_style custom step temp etotal pe\n"
@@ -1456,10 +1455,11 @@ class LammpsSimulation(object):
             inp_str += "    variable  b loop  ${inloop}\n"
             inp_str += "        if \"${a}==1\" then \"jump SELF skip1\" & \n"
             inp_str += "        else \"variable startT equal 550.00\" & \n"
-            inp_str += "             \"variable    min_eval equal ${min_eval}/10\"\n"
+            inp_str += "             \"variable    min_eval equal ${min_eval}/2\"\n"
             inp_str += "        \n"
-            inp_str += "        variable curT equal ${startT}+(${finalT}-${startT})/${inloop}*$b+($a-1)*50\n"
-            inp_str += "        velocity all create ${curT} 48324\n"
+            inp_str += "        variable curT equal ${startT}+(${finalT}-${startT})/${inloop}*$b+($a-1)*0\n"
+            inp_str += "        variable rnd_num equal ceil(random(0,10000,3))\n"
+            inp_str += "        velocity all create ${curT} ${rnd_num}\n"
             fix = self.fixcount() 
             inp_str += "        fix %i all nvt temp ${curT} ${curT} 100\n"%fix
             inp_str += "        variable iters equal ${max_iter}-$b*${dec_iter}\n"
@@ -1526,7 +1526,8 @@ class LammpsSimulation(object):
             inp_str += "next        a\n"
             inp_str += "jump        SELF strainloop\n"
 
-            # Final fully relaxation of the structure at 0 K 
+            # Final fully relaxation of the structure with minimum energy at 0 K 
+            inp_str +="read_dump   tmp_structure.dump 0 x y z box yes format native \n"
             inp_str += "velocity all create 0 393427\n"
             inp_str += "%-15s %s\n"%("min_style", min_style)
             # inp_str += "%-15s %s\n"%("print", "\"MinStep,CellMinStep,AtomMinStep,FinalStep,Energy,EDiff\"" + 
@@ -1555,11 +1556,10 @@ class LammpsSimulation(object):
             inp_str += "%-15s %s\n"%("jump", "SELF loop_min")
             inp_str += "%-15s %s\n"%("label", "break_min")
 
-
             # MOHAMAD: dump the relaxed structure
             inp_str += "dump  relax all custom 1 relaxed.lammpstrj element x y z\n"
             inp_str += "%-15s %s\n"%("dump_modify", "relax element %s"%(
-                                     " ".join([self.graph.node[self.unique_atom_types[key]]['element'] 
+                                     " ".join([self.unique_atom_types[key][1]['element'] 
                                                 for key in sorted(self.unique_atom_types.keys())])))
             inp_str += "run 0\n"
             inp_str += "undump relax\n"

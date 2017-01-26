@@ -3512,14 +3512,11 @@ class UFF4MOF(ForceField):
                         # change the bond orders to 0.5 as per the paper
                         for n in self.graph.neighbors(node):
                             self.graph[node][n]['order'] = 0.5
-<<<<<<< HEAD
-=======
                             # woops! this is correct only for the M3O type SBUs
                             #if self.graph.node[n]['special_flag'] == "O_z_Zn4O":
                             #    self.graph[node][n]['order'] = 1.0
                             #else:
                             #    self.graph[node][n]['order'] = 0.5
->>>>>>> upstream/master
                     elif data['special_flag'] == "C_Zn4O":
                         data['force_field_type'] = "C_R"
                         for n in self.graph.neighbors(node):
