@@ -17,7 +17,7 @@ import ForceFields
 import itertools
 import operator
 from structure_data import from_CIF, write_CIF, clean
-from structure_data import write_RASPA_CIF, write_RASPA_sim_files, MDMC_config
+from structure_data import write_RASPA_CIF, write_RASPA_sim_files, MDMC_config, replace_graph
 from CIFIO import CIF
 from ccdc import CCDC_BOND_ORDERS
 from datetime import datetime
@@ -328,7 +328,7 @@ class LammpsSimulation(object):
         dihedrals = set([j['potential'].name for a,b,c,d,j in list(self.unique_dihedral_types.values())])
         if len(list(dihedrals)) > 1:
             self.dihedral_style = "hybrid %s"%" ".join(list(dihedrals))
-        else:
+        elif len(list(dihedrals)) == 1:
             self.dihedral_style = "%s"%list(dihedrals)[0]
             for a,b,c,d, di in list(self.unique_dihedral_types.values()):
                 di['potential'].reduced = True
@@ -338,6 +338,8 @@ class LammpsSimulation(object):
                     di['potential'].at.reduced=True
                     di['potential'].aat.reduced=True
                     di['potential'].bb13.reduced=True
+        else:
+            self.dihedral_style = ""    
 
         impropers = set([j['potential'].name for a,b,c,d,j in list(self.unique_improper_types.values())])
         if len(list(impropers)) > 1:
@@ -2111,6 +2113,11 @@ def main():
         write_CIF(graph, cell)
         sys.exit()
 
+    if options.replace_in_graph:
+        print("CIF file requested. Exiting...")
+        graph_n,cell_n=replace_graph(graph,cell)
+        write_RASPA_CIF(graph_n, cell_n)
+        sys.exit()
     sim.write_lammps_files()
 
     # Additional capability to write RASPA files if requested

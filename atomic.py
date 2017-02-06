@@ -133,7 +133,7 @@ ATOMIC_NUMBER = [
 
 COVALENT_RADII = {
     # Covalent radii revisited -- DOI:10.1039/B801115J
-    "H": 0.31,
+    "H": 0.25, ## 0.31 !! temporary for methyl
     "He": 0.28,
     "Li": 1.28,
     "Be": 0.96,

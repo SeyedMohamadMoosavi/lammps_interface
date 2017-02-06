@@ -1485,6 +1485,47 @@ def from_CIF(cifname):
     mg.cell = cell
     return cell, mg
 
+def normalize_vector(v):
+    s=0
+    for element in v:
+        s+=element**2
+    norm=np.sqrt(s)
+    return v/norm
+
+def replace_graph(graph,cell):
+    graph_n=deepcopy(graph)
+    def min_distance(coords1, coords2, cell):
+        one = np.dot(cell.inverse, coords1) % 1
+        two = np.dot(cell.inverse, coords2) % 1
+        three = np.around(one - two)
+        four = np.dot(one - two - three, cell.cell)
+        return four
+
+    for node, data in graph.nodes_iter(data=True):
+        neighbours = [graph.node[i]['element'] for i in graph.neighbors(node)]
+        if data['element']=="C" and neighbours.count('N')==2:
+            node_H = [i for i in graph.neighbors(node) if graph.node[i]['element']=="H"][0]
+            graph_n.node[node_H]['element']="C"
+            graph_n.node[node_H]['force_field_type']="C_3"
+            coords_node=data['cartesian_coordinates']
+            coords_H = graph.node[node_H]['cartesian_coordinates']
+            v1=min_distance(coords_H,coords_node,cell )
+            v1=normalize_vector(v1) # C-C direction
+            sign=np.sign(v1[0]*v1[1])
+            v2=normalize_vector(np.array([-np.sqrt(v1[1]**2/(v1[0]**2+v1[1]**2))*sign
+                        , np.sqrt(v1[0]**2/(v1[0]**2+v1[1]**2))
+                        ,0 ]))
+            v3=normalize_vector(np.cross(v1,v2))
+            basis=np.array([v1,v2,v3])
+            new_atoms=np.array([[1.3,0.6,0.0],[1.3,-0.35,0.5],[1.3,-0.35,-0.5]])
+            for at in new_atoms:
+                coords_new=coords_node+basis.T.dot(at)
+                coords_new=['H','H_',coords_new]
+                atheads=['_atom_site_label','force_field_type','cartesian_coordinates']
+                kwargs = {a:j for a, j in zip(atheads, coords_new)}
+                graph_n.add_atomic_node(**kwargs)
+    return graph_n, cell
+
 def write_CIF(graph, cell):
     """Currently used for debugging purposes"""
     c = CIF(name="%s.debug"%graph.name)

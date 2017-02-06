@@ -42,6 +42,12 @@ class Options(object):
                                  " Write force_field_mixing_rules.def file for this MOF"+
                                  " Write force_field.def file for this MOF")
 
+        parser.add_argument("-orep", "--output-replaced",
+                            action="store_true",
+                            dest="replace_in_graph",
+                            help="replace a specific atom on the graph"
+                                 )
+
         #split the command line options into separate groups for nicer
         #visualization.
         force_field_group = parser.add_argument_group("Force Field options")
