@@ -144,7 +144,7 @@ COVALENT_RADII = {
     "C_R": 0.73,
     "C_3": 0.76,
     "N": 0.71,
-    "O": 0.66,
+    "O": 0.3, ## 0.66 !! temporary for ZIFs
     "F": 0.57,
     "Ne": 0.58,
     "Na": 1.66,
@@ -153,7 +153,7 @@ COVALENT_RADII = {
     "Si": 1.11,
     "P": 1.07,
     "S": 1.05,
-    "Cl": 1.02,
+    "Cl": 1.02, ## 0.31 used for ZIFs !! temporary for ZIFs, 1.02 is correct
     "Ar": 1.06,
     "K": 2.03,
     "Ca": 1.76,

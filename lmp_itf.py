@@ -1395,7 +1395,7 @@ class LammpsSimulation(object):
             inp_str += "%-15s %s\n"%("fix","%i all box/relax %s 0.0 vmax 0.01"%(fix, box_min))
             inp_str += "%-15s %s\n"%("minimize","1.0e-15 1.0e-15 10000 100000")
             inp_str += "%-15s %s\n"%("unfix", "%i"%fix)
-            inp_str += "%-15s %s\n"%("min_style", "fire")
+            inp_str += "%-15s %s\n"%("min_style", "cg") # use fire here for more accuracy
             inp_str += "%-15s %-10s %s\n"%("variable", "tempstp", "equal $(step)")
             inp_str += "%-15s %-10s %s\n"%("variable", "CellMinStep", "equal ${tempstp}")
             inp_str += "%-15s %s\n"%("minimize","1.0e-15 1.0e-15 10000 100000")
@@ -1444,8 +1444,9 @@ class LammpsSimulation(object):
             outloop=11
             max_iter=101000
             decrease_iters=10000
-            scale_annealing=1.1
+            scale_annealing=1.15
             # Setting thermo
+            inp_str += "timestep 0.2\n"
             inp_str += "thermo 100\n"
             inp_str += "thermo_style custom step temp etotal pe\n"
             inp_str += "run 1\n"
@@ -1467,7 +1468,7 @@ class LammpsSimulation(object):
             inp_str += "    label     temperatureloop\n"
             inp_str += "    variable  b loop  ${inloop}\n"
             inp_str += "        if \"${a}==1\" then \"jump SELF skip1\" & \n"
-            inp_str += "        else \"variable startT equal 550.00\" & \n"
+            inp_str += "        else \"variable startT equal %4.2f\" & \n"%annealing_T_start
             inp_str += "             \"variable    min_eval equal ${min_eval}/2\"\n"
             inp_str += "        \n"
             inp_str += "        variable curT equal ${startT}+(${finalT}-${startT})/${inloop}*$b+($a-1)*0\n"
@@ -2108,6 +2109,19 @@ def main():
     sim.assign_force_fields()
     sim.compute_simulation_size()
     sim.merge_graphs()
+    for node, data in graph.nodes_iter(data=True):
+        neighbours = [graph.node[i]['element'] for i in graph.neighbors(node)]
+        if data['element']=="H" and neighbours.count('H')>0:
+            print("Error! \nH-H bond found!")
+            sys.exit()
+        elif data['element']=="O" and neighbours.count('O')>0:
+            print("Error! \nO-O bond found!")
+            sys.exit()
+        elif data['element']=="Cl" and (len(neighbours)> 1 or neighbours.count('C')==0):
+            print(neighbours)
+            print("Error! \nCl  bond is wrong!")
+            sys.exit()
+
     if options.output_cif:
         print("CIF file requested. Exiting...")
         write_CIF(graph, cell)
