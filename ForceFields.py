@@ -3065,7 +3065,8 @@ class Dreiding(ForceField):
         else:
             st = ["%-15s %s"%("pair_modify", "tail yes")]
         st += ["%-15s %.1f"%('dielectric', 1.0), 
-               "%-15s %s"%("special_bonds", "dreiding") # equivalent to 'special_bonds lj 0.0 0.0 1.0'
+#               "%-15s %s"%("special_bonds", "dreiding") # equivalent to 'special_bonds lj 0.0 0.0 1.0'
+              "%-15s %s"%("special_bonds", "lj/coul 0.0 0.0 0.0"), 
                ]
         return st
 

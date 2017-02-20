@@ -104,6 +104,11 @@ class Options(object):
 
         
         simulation_group = parser.add_argument_group("Simulation options")
+        simulation_group.add_argument("--turnoffpairs", action="store_true",
+                                      dest="turnoffpairs",
+                                      default=False,
+                                      help="Request input files necessary for"
+                                      + " a geometry optimization. Default off")
         simulation_group.add_argument("--minimize", action="store_true",
                                       dest="minimize",
                                       default=False,

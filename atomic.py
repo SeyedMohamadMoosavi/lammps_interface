@@ -143,8 +143,8 @@ COVALENT_RADII = {
     "C_2": 0.73,
     "C_R": 0.73,
     "C_3": 0.76,
-    "N": 0.71,
-    "O": 0.3, ## 0.66 !! temporary for ZIFs
+    "N": 0.71, 
+    "O": 0.66, ## 0.66 !! temporary for ZIFs 0.3 used
     "F": 0.57,
     "Ne": 0.58,
     "Na": 1.66,

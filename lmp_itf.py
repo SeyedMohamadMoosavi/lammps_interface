@@ -1231,6 +1231,8 @@ class LammpsSimulation(object):
         inp_str += "\n"
         inp_str += "%-15s %s\n"%("box tilt","large")
         inp_str += "%-15s %s\n"%("read_data","data.%s"%(self.name))
+        if self.options.turnoffpairs:
+            inp_str += 'pair_modify  compute no tail no\n'
     
         if(not self.pair_in_data):
             inp_str += "#### Pair Coefficients ####\n"

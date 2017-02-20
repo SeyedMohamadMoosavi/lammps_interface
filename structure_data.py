@@ -1537,44 +1537,44 @@ def replace_graph(graph,cell):
     ##             graph_n.add_atomic_node(**kwargs)
 
     ##  ####  substituting 2 Hs with 2 Cls ###
+    ## for node, data in graph.nodes_iter(data=True):
+    ##     neighbours = [graph.node[i]['element'] for i in graph.neighbors(node)]
+    ##     if data['element']=="C" and neighbours.count('N')==2:
+    ##         node_H = [i for i in graph.neighbors(node) if graph.node[i]['element']=="H"][0]
+    ##         graph.node[node_H]['element']="C1"
+
+    ## for node, data in graph.nodes_iter(data=True):
+    ##     if data['element']=="H":
+    ##         graph_n.node[node]['force_field_type']="Cl"
+    ##         graph_n.node[node]['label']="Cl"
+    ##         graph_n.node[node]['element']="Cl"
+
+    ####  substituting H with NO2 ###
     for node, data in graph.nodes_iter(data=True):
         neighbours = [graph.node[i]['element'] for i in graph.neighbors(node)]
         if data['element']=="C" and neighbours.count('N')==2:
             node_H = [i for i in graph.neighbors(node) if graph.node[i]['element']=="H"][0]
-            graph.node[node_H]['element']="C1"
-
-    for node, data in graph.nodes_iter(data=True):
-        if data['element']=="H":
-            graph_n.node[node]['force_field_type']="Cl"
-            graph_n.node[node]['label']="Cl"
-            graph_n.node[node]['element']="Cl"
-
-    ####  substituting H with NO2 ###
-    ##  for node, data in graph.nodes_iter(data=True):
-    ##      neighbours = [graph.node[i]['element'] for i in graph.neighbors(node)]
-    ##      if data['element']=="C" and neighbours.count('N')==2:
-    ##          node_H = [i for i in graph.neighbors(node) if graph.node[i]['element']=="H"][0]
-    ##          node_N1 = [i for i in graph.neighbors(node) if graph.node[i]['element']=="N"][0]
-    ##          node_N2 = [i for i in graph.neighbors(node) if graph.node[i]['element']=="N"][1]
-    ##          graph_n.node[node_H]['element']="N"
-    ##          graph_n.node[node_H]['force_field_type']="N_R"
-    ##          coords_node=data['cartesian_coordinates']
-    ##          coords_H = graph.node[node_H]['cartesian_coordinates']
-    ##          coords_N1 = graph.node[node_N1]['cartesian_coordinates']
-    ##          coords_N2 = graph.node[node_N2]['cartesian_coordinates']
-    ##          v1=normalize_vector(min_distance(coords_H,coords_node,cell ))  # C-H 
-    ##          v2=normalize_vector(min_distance(coords_N1,coords_node,cell )) # C-N1 
-    ##          v3=normalize_vector(min_distance(coords_N2,coords_node,cell )) # C-N2 
-    ##          v2=normalize_vector(v2-(v1.dot(v2))*v1) # orthogonal to v1
-    ##          v3=normalize_vector(v3-(v1.dot(v3))*v1) # orthogonal to v1
-    ##          basis=np.array([v1,v2,v3])
-    ##          new_atoms=np.array([[1.3,0.7,0.0],[1.3,0.0,0.7]])
-    ##          for at in new_atoms:
-    ##              coords_new=coords_node+basis.T.dot(at)
-    ##              coords_new=['O','O_R',coords_new]
-    ##              atheads=['_atom_site_label','force_field_type','cartesian_coordinates']
-    ##              kwargs = {a:j for a, j in zip(atheads, coords_new)}
-    ##              graph_n.add_atomic_node(**kwargs)
+            node_N1 = [i for i in graph.neighbors(node) if graph.node[i]['element']=="N"][0]
+            node_N2 = [i for i in graph.neighbors(node) if graph.node[i]['element']=="N"][1]
+            graph_n.node[node_H]['element']="N"
+            graph_n.node[node_H]['force_field_type']="N_R"
+            coords_node=data['cartesian_coordinates']
+            coords_H = graph.node[node_H]['cartesian_coordinates']
+            coords_N1 = graph.node[node_N1]['cartesian_coordinates']
+            coords_N2 = graph.node[node_N2]['cartesian_coordinates']
+            v1=normalize_vector(min_distance(coords_H,coords_node,cell ))  # C-H 
+            v2=normalize_vector(min_distance(coords_N1,coords_node,cell )) # C-N1 
+            v3=normalize_vector(min_distance(coords_N2,coords_node,cell )) # C-N2 
+            v2=normalize_vector(v2-(v1.dot(v2))*v1) # orthogonal to v1
+            v3=normalize_vector(v3-(v1.dot(v3))*v1) # orthogonal to v1
+            basis=np.array([v1,v2,v3])
+            new_atoms=np.array([[1.3,0.7,0.0],[1.3,0.0,0.7]])
+            for at in new_atoms:
+                coords_new=coords_node+basis.T.dot(at)
+                coords_new=['O','O_R',coords_new]
+                atheads=['_atom_site_label','force_field_type','cartesian_coordinates']
+                kwargs = {a:j for a, j in zip(atheads, coords_new)}
+                graph_n.add_atomic_node(**kwargs)
     ###########################################
     return graph_n, cell
 
