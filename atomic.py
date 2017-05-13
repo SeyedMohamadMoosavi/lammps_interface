@@ -135,7 +135,7 @@ COVALENT_RADII = {
     # Covalent radii revisited -- DOI:10.1039/B801115J
     "H": 0.25, ## 0.31 !! temporary for methyl
     "He": 0.28,
-    "Li": 1.28,
+    "Li": 1.8,
     "Be": 0.96,
     "B": 0.84,
     "C": 0.76,  # for sp3; sp2 = 0.73; sp = 0.69

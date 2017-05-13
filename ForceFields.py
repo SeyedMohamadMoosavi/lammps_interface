@@ -5,7 +5,7 @@ from uff_qeq import UFF_QEQ
 from uff_nonbonded import UFF_DATA_nonbonded
 from BTW import BTW_angles, BTW_dihedrals, BTW_opbends, BTW_atoms, BTW_bonds, BTW_charges
 from Dubbeldam import Dub_atoms, Dub_bonds, Dub_angles, Dub_dihedrals, Dub_impropers
-#from FMOFCu import FMOFCu_angles, FMOFCu_dihedrals, FMOFCu_opbends, FMOFCu_atoms, FMOFCu_bonds
+from FMOFCu import FMOFCu_angles, FMOFCu_dihedrals, FMOFCu_opbends, FMOFCu_atoms, FMOFCu_bonds
 from MOFFF import MOFFF_angles, MOFFF_dihedrals, MOFFF_opbends, MOFFF_atoms, MOFFF_bonds
 from water_models import SPC_E_atoms, TIP3P_atoms, TIP4P_atoms, TIP5P_atoms
 from gas_models import EPM2_atoms, EPM2_angles
@@ -2035,14 +2035,14 @@ class FMOFCu(ForceField):
         atom_b_fflabel=b_data['force_field_type']
         atom_c_fflabel=c_data['force_field_type']
         atom_d_fflabel=d_data['force_field_type']
-        Kopb = FMOFCu_opbends[data['force_field_type']][0]/(DEG2RAD**2)*0.02191418
+        Kopb = FMOFCu_opbends[data['force_field_type']][0]/(DEG2RAD**2)*0.02191418/3.0
         c0 =  FMOFCu_opbends[data['force_field_type']][1]
         """
         Angle-Angle term
         """
-        M1 = FMOFCu_opbends[data['force_field_type']][2]/(DEG2RAD**2)*0.02191418*(-1)/3.  # Three times counting one angle-angle interaction 
-        M2 = FMOFCu_opbends[data['force_field_type']][3]/(DEG2RAD**2)*0.02191418*(-1)/3.  # Three times counting one angle-angle interaction 
-        M3 = FMOFCu_opbends[data['force_field_type']][4]/(DEG2RAD**2)*0.02191418*(-1)/3.  # Three times counting one angle-angle interaction 
+        M1 = FMOFCu_opbends[data['force_field_type']][2]/(DEG2RAD**2)*0.02191418*(-1)/3.*0.0  # Three times counting one angle-angle interaction 
+        M2 = FMOFCu_opbends[data['force_field_type']][3]/(DEG2RAD**2)*0.02191418*(-1)/3.*0.0  # Three times counting one angle-angle interaction 
+        M3 = FMOFCu_opbends[data['force_field_type']][4]/(DEG2RAD**2)*0.02191418*(-1)/3.*0.0  # Three times counting one angle-angle interaction 
         ang1_ff_label = atom_a_fflabel+"_"+atom_b_fflabel+"_"+atom_c_fflabel
         ang2_ff_label = atom_a_fflabel+"_"+atom_b_fflabel+"_"+atom_d_fflabel
         ang3_ff_label = atom_c_fflabel+"_"+atom_b_fflabel+"_"+atom_d_fflabel
@@ -2062,7 +2062,7 @@ class FMOFCu(ForceField):
             ang3_ff_label = atom_d_fflabel+"_"+atom_b_fflabel+"_"+atom_c_fflabel
             Theta3 =  FMOFCu_angles[ang3_ff_label][1]
                 
-        data['potential'] =  ImproperPotential.Class2() #does not work now!
+        data['potential'] =  ImproperPotential.Class2() 
         data['potential'].K = Kopb 
         data['potential'].chi0 = c0
         data['potential'].aa.M1 = M1 
@@ -2583,7 +2583,10 @@ class Dreiding(ForceField):
         R1 = DREIDING_DATA[fflabel1][0]
         R2 = DREIDING_DATA[fflabel2][0]
         order = data['order'] 
-        K = order*700.
+        if "Zn" in fflabel1+fflabel2:
+            K=order*700.*0.5 # NOTE added as correction for ZIFs
+        else:
+            K = order*700.
         D = order*70.
         Re = R1 + R2 - 0.01
         
@@ -2642,7 +2645,8 @@ class Dreiding(ForceField):
         a_data, b_data, c_data = self.graph.node[a], self.graph.node[b], self.graph.node[c] 
         btype = b_data['force_field_type']
         theta0 = DREIDING_DATA[btype][1]
-        
+        if ("N" in btype) and ("Zn" in a_data['force_field_type']): # NOTE: added as correction for ZIFs
+            K*=0.5
         if (self.keep_metal_geometry) and (b_data['atomic_number'] in METALS):
             theta0 = self.graph.compute_angle_between(a, b, c)
             data['potential'] = AnglePotential.CosineSquared()

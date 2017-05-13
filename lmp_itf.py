@@ -1213,7 +1213,7 @@ class LammpsSimulation(object):
         inp_str += "%-15s %s\n"%("boundary","p p p")
         inp_str += "\n"
         if(len(self.unique_pair_types.keys()) > 0):
-            inp_str += "%-15s %s\n"%("pair_style", self.pair_style)
+            inp_str += "%-15s %s 12.5\n"%("pair_style", self.pair_style.split()[0])
         if(len(self.unique_bond_types.keys()) > 0):
             inp_str += "%-15s %s\n"%("bond_style", self.bond_style)
         if(len(self.unique_angle_types.keys()) > 0):
@@ -1870,6 +1870,9 @@ class LammpsSimulation(object):
             min_style=True
             thermo_style=False
 
+            ## added by Mohamad to color structures!
+            inp_str += "reset_timestep 0\n"
+            ###################################
             inp_str += "\n%-15s %s\n"%("dump", "str all atom 1 initial_structure.dump")
             inp_str += "%-15s\n"%("run 0")
             inp_str += "%-15s %-10s %s\n"%("variable", "rs", "equal step")
@@ -1882,7 +1885,7 @@ class LammpsSimulation(object):
                 inp_str += "%-15s %-10s %s\n"%("variable", "dt", "equal %.2f"%(1.0))
                 inp_str += "%-15s %-10s %s\n"%("variable", "tdamp", "equal 100*${dt}")
             elif min_style:
-                inp_str += "%-15s %s\n"%("min_style","fire")
+                inp_str += "%-15s %s\n"%("min_style","cg")
             inp_str += "%-15s %-10s %s\n"%("variable", "at", "equal cella")
             inp_str += "%-15s %-10s %s\n"%("variable", "bt", "equal cellb")
             inp_str += "%-15s %-10s %s\n"%("variable", "ct", "equal cellc")
@@ -1899,6 +1902,23 @@ class LammpsSimulation(object):
             inp_str += "%-15s %s\n"%("print", "\"Loop,CellScale,Vol,Pressure,E_total,E_pot,E_kin" + 
                                               ",E_bond,E_angle,E_torsion,E_imp,E_vdw,E_coul\""+
                                               " file %s.output.csv screen no"%(self.name))
+
+            ## added by Mohamad to color structures!
+            inp_str += "compute refpe all pe/atom\n"
+            inp_str += "variable peref atom c_refpe\n"
+            inp_str += "compute refpevdW all pe/atom pair\n"
+            inp_str += "variable perefvdW atom c_refpevdW\n"
+            inp_str += "run 0\n"
+            inp_str += "dump refpe    all custom  1 ref.pe    v_peref\n"
+            inp_str += "dump refpevdW all custom  1 ref.pevdW v_perefvdW\n"
+            inp_str += "run 0\n"
+            inp_str += "undump refpe\n"
+            inp_str += "undump refpevdW\n"
+            inp_str += "compute peall all pe/atom\n"
+            inp_str += "variable peall atom c_peall\n"
+            inp_str += "compute pevdW all pe/atom pair\n"
+            inp_str += "variable pevdW atom c_pevdW\n"
+            ###################################
             inp_str += "%-15s %-10s %s\n"%("variable", "do", "loop ${N}")
             inp_str += "%-15s %s\n"%("label", "loop_bulk")
             inp_str += "%-15s %s\n"%("read_dump", "initial_structure.dump ${readstep} x y z box yes format native")
@@ -1912,6 +1932,15 @@ class LammpsSimulation(object):
                 inp_str += "%-15s %s\n"%("print", "\"${do},${scaleVar},$(vol),$(press),$(etotal),$(pe),$(ke)"+
                                               ",$(ebond),$(eangle),$(edihed),$(eimp),$(evdwl),$(ecoul)\""+
                                               " append %s.output.csv screen no"%(self.name))
+
+            ## added by Mohamad to color structures!
+                inp_str += "dump pe${do} all custom  1 ${do}.pe   v_peall\n"
+                inp_str += "dump pevdW${do} all custom  1 ${do}.pevdW   v_pevdW\n"
+                inp_str += "run 0\n"
+                inp_str += "undump pe${do}\n"
+                inp_str += "undump pevdW${do}\n"
+            ###################################
+            
             elif (thermo_style):
                 inp_str += "%-15s %s\n"%("velocity", "all create ${simTemp} %i"%(np.random.randint(1,3000000)))
                 inp_str += "%-15s %s %s %s \n"%("fix", "bm", "all nvt", "temp ${simTemp} ${simTemp} ${tdamp} tchain 5")
